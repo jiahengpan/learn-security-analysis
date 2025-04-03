@@ -1,9 +1,9 @@
-import Book  from '../models/book';
-import BookInstance, { IBookInstance }  from '../models/bookinstance';
+import Book from '../models/book';
+import BookInstance, { IBookInstance } from '../models/bookinstance';
 import express from 'express';
+import validator from 'validator';
 
 const router = express.Router();
-
 
 /**
  * @route GET /book_dtls
@@ -14,7 +14,17 @@ const router = express.Router();
  * @returns 500 - if there is an error in the database
  */
 router.get('/', async (req, res) => {
-  const id = req.query.id as string;
+  // Input validation for the id parameter
+  const rawId = req.query.id;
+  
+  // Check if id exists and is a string
+  if (!rawId || typeof rawId !== 'string') {
+    return res.status(400).json({ error: 'Missing or invalid book ID' });
+  }
+  
+  // Sanitize the ID parameter - assuming it should be alphanumeric
+  const id = validator.escape(rawId);
+  
   try {
     const [book, copies] = await Promise.all([
       Book.getBook(id),
@@ -22,10 +32,14 @@ router.get('/', async (req, res) => {
     ]);
 
     if (!book) {
-      res.status(404).send(`Book ${id} not found`);
+      // Safe way to return the sanitized ID
+      res.status(404).json({ error: `Book not found`, id: id });
       return;
     }
 
+    // Setting proper content type and sending JSON response
+    // JSON.stringify handles the escaping of special characters
+    res.setHeader('Content-Type', 'application/json');
     res.send({
       title: book.title,
       author: book.author.name,
@@ -33,7 +47,7 @@ router.get('/', async (req, res) => {
     });
   } catch (err) {
     console.error('Error fetching book:', err);
-    res.status(500).send(`Error fetching book ${id}`);
+    res.status(500).json({ error: 'Error fetching book' });
   }
 });
 
